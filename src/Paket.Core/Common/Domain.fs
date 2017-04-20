@@ -5,10 +5,13 @@ open System.IO
 open System.Text.RegularExpressions
 
 /// Represents a NuGet package name
-[<System.Diagnostics.DebuggerDisplay("{ToString()}")>]
+[<System.Diagnostics.DebuggerDisplay("{CompareString}")>]
 [<CustomEquality;CustomComparison>]
 type PackageName =
 | PackageName of string * string
+
+    member this.CompareString =
+        this |> function PackageName(_,id) -> id
 
     member this.GetCompareString() =
         match this with
@@ -30,6 +33,9 @@ type PackageName =
           match that with 
           | :? PackageName as that -> StringComparer.Ordinal.Compare(this.GetCompareString(), that.GetCompareString())
           | _ -> invalidArg "that" "cannot compare value of different types"
+
+    static member Create (name:string) = 
+        PackageName.PackageName(name.Trim(),name.ToLowerInvariant().Trim())
 
 /// Function to convert a string into a NuGet package name
 let PackageName(name:string) = PackageName.PackageName(name.Trim(),name.ToLowerInvariant().Trim())
@@ -64,14 +70,14 @@ type PackageFilter =
 [<CustomEquality;CustomComparison>]
 type GroupName =
 | GroupName of string * string
+    member this.CompareString =
+        this |> function GroupName (_,id) -> id
 
     member this.GetCompareString() =
-        match this with
-        | GroupName(_,id) -> id
+        this |> function GroupName (_,id) -> id
 
     override this.ToString() = 
-        match this with
-        | GroupName(name,_) -> name
+        this |> function GroupName (_,id) -> id
 
     override this.Equals(that) = 
         match that with
@@ -91,6 +97,20 @@ let GroupName(name:string) =
     match name.ToLowerInvariant().Trim() with
     | "lib" | "runtimes" -> invalidArg "name" (sprintf "It is not allowed to use '%s' as group name." name)
     | id -> GroupName.GroupName(name.Trim(), id)
+
+let [<Literal>] MainGroup = "Main"
+
+type QualifiedPackageName = 
+    | QualifiedPackageName of GroupName * PackageName
+    static member FromStrings (groupName: string option, packageName: string) =
+        let groupName = 
+            match groupName with
+            | None 
+            | Some "" -> GroupName MainGroup
+            | Some name -> GroupName name
+        let packageName = PackageName.Create packageName
+        QualifiedPackageName (groupName, packageName)
+
 
 type DomainMessage = 
     | DirectoryDoesntExist of DirectoryInfo
